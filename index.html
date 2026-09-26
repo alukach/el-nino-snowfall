@@ -45,6 +45,10 @@
       #winter-badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #e5e7eb; color: #374151; }
       #winter-badge.nino { background: #c2410c; color: #fff; }
       #winter-roni { font-size: 12px; color: #555; }
+      @media (max-width: 640px) {
+        #dock { bottom: 56px; } /* attribution wraps to two lines */
+        #scrub { flex-basis: 100%; order: -1; } /* slider on its own row, buttons and info below */
+      }
 
       #chart { padding: 10px 12px; }
       #chart-head { display: flex; align-items: flex-start; gap: 8px; }

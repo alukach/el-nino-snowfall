@@ -95,6 +95,7 @@ const winterScale = (winter_anomaly.attrs.colorbar_limit as number | undefined) 
 
 const map = new MaplibreMap({
   container: "map",
+  hash: true, // #zoom/lat/lng, so links carry the view
   style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   center: [-100, 50],
   zoom: 2.4,
@@ -150,12 +151,32 @@ map.addLayer({
   paint: { "circle-radius": 3.5, "circle-color": "#1d4ed8", "circle-stroke-color": "#fff", "circle-stroke-width": 1 },
 });
 const skiInput = $<HTMLInputElement>("ski");
-skiInput.addEventListener("change", () =>
-  map.setLayoutProperty("ski-resorts", "visibility", skiInput.checked ? "visible" : "none"),
-);
+skiInput.addEventListener("change", () => {
+  map.setLayoutProperty("ski-resorts", "visibility", skiInput.checked ? "visible" : "none");
+  syncUrl();
+});
 
 // `winter` is an index into `winters`.
 const state = { mode: "anomaly" as Mode, winter: winters.length - 1 };
+
+// --- Shareable URL: ?layer=<mode>&winter=<year>&ski=1&cell=<lat>,<lng> (map view lives in the hash) ---------
+const params = new URLSearchParams(location.search);
+if (["anomaly", "below_count", "winter_anomaly"].includes(params.get("layer")!)) state.mode = params.get("layer") as Mode;
+if (winters.includes(Number(params.get("winter")))) state.winter = winters.indexOf(Number(params.get("winter")));
+document.querySelector<HTMLInputElement>(`input[name=mode][value="${state.mode}"]`)!.checked = true;
+if (params.get("ski") === "1") {
+  skiInput.checked = true;
+  map.setLayoutProperty("ski-resorts", "visibility", "visible");
+}
+function syncUrl() {
+  const q = new URLSearchParams();
+  if (state.mode !== "anomaly") q.set("layer", state.mode);
+  if (state.mode === "winter_anomaly") q.set("winter", String(winters[state.winter]));
+  if (skiInput.checked) q.set("ski", "1");
+  if (chart.cell) q.set("cell", chart.cell.map((v) => v.toFixed(2)).join(","));
+  const qs = q.toString();
+  history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}${location.hash}`);
+}
 
 // --- Timeline -------------------------------------------------------------------------------------------------
 
@@ -210,6 +231,7 @@ function update() {
   const { mode, winter } = state;
   renderTimeline();
   drawChart();
+  syncUrl();
   void load(mode, winter); // warm the hover cache
 
   const scale = mode === "winter_anomaly" ? winterScale : anomalyScale;
@@ -298,7 +320,7 @@ function placeName(lngLat: LngLat, point: Point): string {
 // --- Chart ----------------------------------------------------------------------------------------------------
 
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
-const chart = { values: null as Values | null, place: "", subtitle: "" };
+const chart = { values: null as Values | null, place: "", subtitle: "", cell: null as [lat: number, lng: number] | null };
 
 // Line chart of one cell's JFM snowfall for every winter. Every point is clickable (maps that winter); El Niño
 // winters are orange dots sized by RONI. 1991–2020 mean dashed, linear trend thin, selected winter marked.
@@ -377,14 +399,13 @@ svgEl.addEventListener("keydown", (ev) => {
 $("chart-close").addEventListener("click", () => {
   $("chart").hidden = true;
   chart.values = null;
+  chart.cell = null;
+  syncUrl();
 });
 window.addEventListener("resize", drawChart);
 
 let clickSeq = 0;
-map.on("click", async ({ lngLat, point }) => {
-  const resort = resortAt(point);
-  // A resort click charts the cell under the resort itself, not wherever the click landed.
-  const at = resort?.geometry.type === "Point" ? { lng: resort.geometry.coordinates[0]!, lat: resort.geometry.coordinates[1]! } : lngLat;
+async function selectCell(at: LngLat, place = "") {
   const cell = cellAt(at);
   if (!cell) return;
   const seq = ++clickSeq; // ignore responses from earlier, slower clicks
@@ -392,11 +413,22 @@ map.on("click", async ({ lngLat, point }) => {
   const chunk = await zarr.get(series, [null, cell[0], cell[1]]);
   if (seq !== clickSeq) return;
   chart.values = chunk.data as Values;
-  chart.place = resort ? resortLabel(resort.properties) : "";
+  chart.place = place;
+  chart.cell = [cellLat, cellLng];
   chart.subtitle = `JFM snowfall (mm w.e.) for the 0.25° grid cell centred on ${cellLat.toFixed(2)}°, ${cellLng.toFixed(2)}°`;
   $("chart").hidden = false;
   drawChart();
+  syncUrl();
+}
+map.on("click", ({ lngLat, point }) => {
+  const resort = resortAt(point);
+  // A resort click charts the cell under the resort itself, not wherever the click landed.
+  const at = resort?.geometry.type === "Point" ? { lng: resort.geometry.coordinates[0]!, lat: resort.geometry.coordinates[1]! } : lngLat;
+  void selectCell(at, resort ? resortLabel(resort.properties) : "");
 });
+// ponytail: a shared ?cell= restores the chart but not the resort name; it needs a hit-test on the rendered dots.
+const [cLat, cLng] = (params.get("cell") ?? "").split(",").map(Number);
+if (Number.isFinite(cLat) && Number.isFinite(cLng)) void selectCell({ lat: cLat!, lng: cLng! });
 
 map.on("mousemove", ({ lngLat, point }) => {
   const cell = cellAt(lngLat);
