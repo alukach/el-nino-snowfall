@@ -1,0 +1,4 @@
+*.zip
+dist
+el-nino-snowfall.zarr
+node_modules

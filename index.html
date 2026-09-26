@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>El Niño Snowfall</title>
+    <style>
+      html, body, #map { margin: 0; height: 100%; }
+      body { font: 14px/1.4 system-ui, sans-serif; color: #222; background: #dde3ea; } /* space around the globe */
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 4px #0004; }
+      #panel { position: absolute; top: 12px; left: 12px; width: 300px; max-width: calc(100vw - 48px); padding: 12px; }
+      #panel h1 { font-size: 15px; margin: 0 0 8px; }
+      #panel label { display: block; }
+      #panel fieldset { border: 0; padding: 0; margin: 0 0 8px; }
+      #legend-bar { height: 12px; border: 1px solid #ccc; }
+      #legend-labels { display: flex; justify-content: space-between; font-size: 12px; }
+      #readout { margin-top: 8px; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+      #panel small { color: #666; }
+      #panel details { margin-top: 8px; font-size: 12px; }
+      #panel dt { font-weight: 600; margin-top: 4px; }
+      #panel dd { margin: 0; }
+
+      /* Bottom dock: chart (when open) above the timeline. The dock itself lets clicks through to the map. */
+      #dock {
+        position: absolute; left: 12px; right: 12px; bottom: 28px; /* above the map attribution */
+        display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+      }
+      #dock > * { pointer-events: auto; }
+
+      #timeline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; }
+      #timeline.inactive #scrub, #timeline.inactive #winter-info { opacity: 0.55; }
+      #timeline button {
+        border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 2px 8px; font: inherit; cursor: pointer;
+      }
+      #timeline button:disabled { opacity: 0.4; cursor: default; }
+      #scrub { --thumb: 16px; position: relative; flex: 1 1 240px; min-width: 160px; }
+      #winter { width: 100%; margin: 0; display: block; }
+      #ticks { position: relative; height: 6px; }
+      #ticks span { position: absolute; top: 0; width: 2px; height: 6px; margin-left: -1px; background: #c2410c; }
+      #winter-info { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      #winter-year { font-weight: 600; min-width: 7.5em; }
+      #winter-badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #e5e7eb; color: #374151; }
+      #winter-badge.nino { background: #c2410c; color: #fff; }
+      #winter-roni { font-size: 12px; color: #555; }
+
+      #chart { padding: 10px 12px; }
+      #chart-head { display: flex; align-items: flex-start; gap: 8px; }
+      #chart-head > div { flex: 1; min-width: 0; }
+      #chart-place { font-size: 15px; margin: 0; }
+      #chart-title { font-size: 12px; color: #555; margin: 0 0 4px; }
+      #chart-close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; color: #555; }
+      #chart-svg { width: 100%; display: block; font-size: 11px; fill: #444; }
+      #chart-svg .winter-dot { cursor: pointer; }
+      #chart-svg .winter-dot:focus-visible { outline: none; stroke: #111; stroke-width: 2; }
+      #chart-key { font-size: 12px; color: #555; }
+      #chart-key span { white-space: nowrap; margin-right: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="panel" class="card">
+      <h1>Snowfall during moderate-to-strong El Niño winters</h1>
+      <fieldset>
+        <legend class="sr-only">Layer</legend>
+        <label><input type="radio" name="mode" value="anomaly" checked /> Mean anomaly, El Niño winters</label>
+        <label><input type="radio" name="mode" value="below_count" /> El Niño winters with below-average snowfall</label>
+        <label><input type="radio" name="mode" value="winter_anomaly" /> Single winter (use the timeline)</label>
+      </fieldset>
+      <label style="margin-bottom: 8px"><input type="checkbox" id="ski" /> Ski resorts (OpenSkiMap)</label>
+      <div id="legend-bar"></div>
+      <div id="legend-labels"></div>
+      <div id="readout" aria-live="polite">Hover the map for values; click a cell for its history</div>
+      <small>ERA5 reconstruction of NOAA Climate.gov's map. JFM, detrended, vs 1991–2020.</small>
+      <details>
+        <summary>Terms</summary>
+        <dl>
+          <dt>JFM</dt>
+          <dd>January–March. Snowfall is summed over these three months of each winter.</dd>
+          <dt>mm w.e.</dt>
+          <dd>Millimetres of water equivalent: the depth of liquid water if the snow melted. Fresh snow is often ~10× deeper, but the ratio varies.</dd>
+          <dt>Anomaly</dt>
+          <dd>Difference from the 1991–2020 average, after removing each location's long-term linear trend.</dd>
+          <dt>El Niño winter</dt>
+          <dd>One of the 14 moderate-to-strong El Niño winters in this dataset (the blog's 13 plus 2023–24).</dd>
+          <dt>RONI</dt>
+          <dd>Relative Oceanic Niño Index (NOAA CPC): tropical Pacific sea-surface temperature anomaly relative to the tropical mean, in °C. Shown for Dec–Feb; ≥ +1.0 is roughly a moderate El Niño, ≥ +1.5 strong, ≤ −0.5 La Niña.</dd>
+        </dl>
+      </details>
+    </div>
+
+    <div id="dock">
+      <div id="chart" class="card" hidden>
+        <div id="chart-head">
+          <div>
+            <h2 id="chart-place"></h2>
+            <p id="chart-title"></p>
+          </div>
+          <button id="chart-close" type="button" aria-label="Close chart">×</button>
+        </div>
+        <svg id="chart-svg" role="img"></svg>
+        <div id="chart-key">
+          <span><span style="color: #c2410c">●</span> El Niño winter (larger = higher RONI)</span>
+          <span><span style="color: #333">●</span> other winter</span>
+          <span><span style="color: #1d4ed8">‒ ‒</span> 1991–2020 mean</span>
+          <span><span style="color: #888">—</span> trend</span>
+          <span>Click a point to map that winter</span>
+        </div>
+      </div>
+
+      <div id="timeline" class="card" role="group" aria-label="Winter timeline">
+        <button id="prev-nino" type="button" title="Previous El Niño winter" aria-label="Previous El Niño winter">⏮ El Niño</button>
+        <button id="prev-year" type="button" title="Previous winter" aria-label="Previous winter">◀</button>
+        <div id="scrub">
+          <input type="range" id="winter" min="0" max="0" step="1" value="0" aria-label="Winter" />
+          <div id="ticks" aria-hidden="true"></div>
+        </div>
+        <button id="next-year" type="button" title="Next winter" aria-label="Next winter">▶</button>
+        <button id="next-nino" type="button" title="Next El Niño winter" aria-label="Next El Niño winter">El Niño ⏭</button>
+        <div id="winter-info" aria-live="polite">
+          <span id="winter-year"></span>
+          <span id="winter-badge"></span>
+          <span id="winter-roni"></span>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
