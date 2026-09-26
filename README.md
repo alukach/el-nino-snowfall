@@ -11,7 +11,7 @@ by Michelle L'Heureux and Brian Brettschneider (Oct 2023). NOAA did not publish 
 - **Mean anomaly (left panel of the original):** the average January–March snowfall anomaly across moderate-to-strong El Niño winters.
 - **Below-average count (right panel):** how many of those winters had below-average snowfall at each location.
 
-The dataset is published at `https://data.source.coop/alukach/el-nino-snowfall`.
+The dataset is published on Source Cooperative at `https://data.source.coop/alukach/el-nino-snowfall` (see https://source.coop/alukach/el-nino-snowfall).
 
 ## Terms
 
