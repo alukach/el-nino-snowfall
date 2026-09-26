@@ -60,6 +60,9 @@ function symmetricScale(values: Values): number {
 const signed = (v: number, digits: number) => `${v > 0 ? "+" : ""}${v.toFixed(digits)}`;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+// On phones the panel starts collapsed to its title so the map is visible.
+if (matchMedia("(max-width: 640px)").matches) $<HTMLDetailsElement>("panel").open = false;
+
 const root = zarr.root(new zarr.FetchStore(ZARR_URL));
 const open = (name: string) => zarr.open.v3(root.resolve(name), { kind: "array" }) as Promise<Arr>;
 const group = await zarr.open.v3(root, { kind: "group" });

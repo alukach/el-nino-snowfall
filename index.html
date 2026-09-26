@@ -10,7 +10,9 @@
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 4px #0004; }
       #panel { position: absolute; top: 12px; left: 12px; width: 300px; max-width: calc(100vw - 48px); padding: 12px; }
-      #panel h1 { font-size: 15px; margin: 0 0 8px; }
+      #panel > summary { cursor: pointer; }
+      #panel[open] > summary { margin-bottom: 8px; }
+      #panel h1 { font-size: 15px; margin: 0; display: inline; }
       #panel label { display: block; }
       #panel fieldset { border: 0; padding: 0; margin: 0 0 8px; }
       #legend-bar { height: 12px; border: 1px solid #ccc; }
@@ -59,8 +61,8 @@
   </head>
   <body>
     <div id="map"></div>
-    <div id="panel" class="card">
-      <h1>Snowfall during moderate-to-strong El Niño winters</h1>
+    <details id="panel" class="card" open>
+      <summary><h1>Snowfall during moderate-to-strong El Niño winters</h1></summary>
       <fieldset>
         <legend class="sr-only">Layer</legend>
         <label><input type="radio" name="mode" value="anomaly" checked /> Mean anomaly, El Niño winters</label>
@@ -87,7 +89,7 @@
           <dd>Relative Oceanic Niño Index (NOAA CPC): tropical Pacific sea-surface temperature anomaly relative to the tropical mean, in °C. Shown for Dec–Feb; ≥ +1.0 is roughly a moderate El Niño, ≥ +1.5 strong, ≤ −0.5 La Niña.</dd>
         </dl>
       </details>
-    </div>
+    </details>
 
     <div id="dock">
       <div id="chart" class="card" hidden>
